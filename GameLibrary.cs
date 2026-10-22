@@ -236,8 +236,8 @@ public static class SteamInfo
             var apps = AppsNode(root, true)!;
             var app = apps.GetOrAddChild(appId);
             if (string.IsNullOrWhiteSpace(options)) app.Remove("LaunchOptions"); else app.Set("LaunchOptions", options.Trim());
-            File.Copy(f, f + ".resetexplode.bak", true); // cópia de segurança do arquivo original
-            File.WriteAllText(f, Vdf.Serialize(root), new System.Text.UTF8Encoding(false));
+            if (!File.Exists(f + ".resetexplode.bak")) File.Copy(f, f + ".resetexplode.bak"); // só o original: nas próximas edições o .bak não vira cópia do já editado
+            AppSettings.WriteAtomic(f, Vdf.Serialize(root), new System.Text.UTF8Encoding(false));
             return null;
         }
         catch (Exception ex) { return "Não consegui gravar: " + ex.Message; }

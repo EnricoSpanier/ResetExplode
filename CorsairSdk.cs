@@ -30,7 +30,7 @@ public sealed class CorsairDevice
 
 /// <summary>
 /// Ponte com o iCUE SDK v4 da Corsair (iCUESDK.x64_2019.dll). A DLL não vem junto: é carregada em tempo de execução
-/// da pasta do programa ou de %AppData%\ResetExplode. O iCUE precisa estar aberto, com o SDK habilitado nas configurações.
+/// da pasta do programa, só se tiver assinatura válida da Corsair. O iCUE precisa estar aberto, com o SDK habilitado nas configurações.
 /// Nada é gravado no hardware: as cores valem enquanto o controle estiver ativo e voltam ao iCUE ao liberar.
 /// </summary>
 public sealed unsafe class CorsairSdk : IDisposable
@@ -82,16 +82,19 @@ public sealed unsafe class CorsairSdk : IDisposable
     public string? LoadDll()
     {
         if (DllLoaded) return null;
-        var dirs = new List<string> { AppContext.BaseDirectory, Path.Combine(AppContext.BaseDirectory, "x64"), AppSettings.Folder };
+        // Só da pasta do programa (protegida contra gravação sem elevação quando instalado em Program Files); nunca do PATH nem do %AppData%.
+        var dirs = new[] { AppContext.BaseDirectory, Path.Combine(AppContext.BaseDirectory, "x64") };
         var names = new[] { DllFile, "iCUESDK.dll" };
         foreach (var d in dirs)
             foreach (var n in names)
             {
                 string p = Path.Combine(d, n);
-                if (File.Exists(p) && NativeLibrary.TryLoad(p, out _lib)) { LoadedFrom = p; goto loaded; }
+                if (!File.Exists(p)) continue;
+                string? bad = Authenticode.Check(p, "Corsair");
+                if (bad != null) return $"Recusei carregar {p}: {bad}. Use a DLL oficial da Corsair, sem modificação.";
+                if (NativeLibrary.TryLoad(p, out _lib)) { LoadedFrom = p; goto loaded; }
             }
-        if (NativeLibrary.TryLoad(DllFile, out _lib)) { LoadedFrom = DllFile; goto loaded; }
-        return $"Não encontrei o {DllFile}. Use o botão BAIXAR O SDK DA CORSAIR (ou copie a DLL para a pasta do ResetExplode.exe ou para {AppSettings.Folder}).";
+        return $"Não encontrei o {DllFile}. Baixe o iCUE SDK v4 em github.com/CorsairOfficial/cue-sdk/releases e copie a DLL para a pasta do ResetExplode.exe ({AppContext.BaseDirectory}).";
 
     loaded:
         try

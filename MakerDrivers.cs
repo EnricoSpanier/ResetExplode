@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Xml.Linq;
@@ -252,8 +252,7 @@ public static class MakerDrivers
     {
         var res = BundleResources(c);
         if (res.Count == 0) return $"O driver do {c.Name} não está incluído nesta versão.";
-        string dir = Path.Combine(Path.GetTempPath(), "ResetExplode", "drivers-incluidos", c.Bundle!);
-        if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        string dir = Path.Combine(AdminDir.Fresh("drivers-incluidos"), c.Bundle!);
         foreach (var n in res)
         {
             string rel = n.Replace('\\', '/')[($"{ResPrefix}{c.Bundle}/").Length..];
@@ -263,13 +262,14 @@ public static class MakerDrivers
             using var dst = File.Create(file);
             await src.CopyToAsync(dst);
         }
+        string restore = await DriverManager.TryRestorePointAsync();
         var (code, output) = await RunAsync("pnputil.exe", $"/add-driver \"{Path.Combine(dir, "*.inf")}\" /subdirs /install");
         try { Directory.Delete(dir, true); } catch { }
         return code switch
         {
-            0 => $"Driver do {c.Name} instalado.",
-            3010 => $"Driver do {c.Name} instalado. Reinicie o PC para finalizar.",
-            259 => $"Driver do {c.Name} adicionado ao Windows: será usado quando a placa for plugada.",
+            0 => $"Driver do {c.Name} instalado. {restore}",
+            3010 => $"Driver do {c.Name} instalado. Reinicie o PC para finalizar. {restore}",
+            259 => $"Driver do {c.Name} adicionado ao Windows: será usado quando a placa for plugada. {restore}",
             _ => $"O Windows não aceitou o driver do {c.Name}: {LastLine(output)}",
         };
     }
