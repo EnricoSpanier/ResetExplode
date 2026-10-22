@@ -133,8 +133,7 @@ public partial class MainWindow
             BtnLightSdk.Visibility = dllProblem != null ? Visibility.Visible : Visibility.Collapsed;
             if (dllProblem != null)
             {
-                LightStatus.Text = "O SDK da Corsair (iCUESDK.x64_2019.dll) ainda não está instalado. Clique em BAIXAR O SDK DA CORSAIR: "
-                                   + "o programa baixa só essa DLL do repositório oficial da Corsair e a instala para você.";
+                LightStatus.Text = dllProblem;
                 return;
             }
 
@@ -269,32 +268,9 @@ public partial class MainWindow
         catch (Exception ex) { OrgbStatus.Text = "OpenRGB: não consegui abrir: " + ex.Message; }
     }
 
-    private async void BtnLightSdk_Click(object sender, RoutedEventArgs e)
+    private void BtnLightSdk_Click(object sender, RoutedEventArgs e)
     {
-        if (_lightBusy) return;
-        var ok = MessageBox.Show(this,
-            "O RESET EXPLODE vai baixar o SDK oficial da Corsair (github.com/CorsairOfficial/cue-sdk), extrair somente o arquivo " +
-            "iCUESDK.x64_2019.dll para a pasta\n" + CorsairSdkInstaller.TargetPath + "\ne conferir a assinatura digital dele.\n\nContinuar?",
-            "RESET EXPLODE · SDK da Corsair", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (ok != MessageBoxResult.Yes) return;
-
-        _lightBusy = true;
-        BtnLightSdk.IsEnabled = false;
-        BtnLightConnect.IsEnabled = false;
-        try
-        {
-            string msg = await CorsairSdkInstaller.InstallAsync(t => Dispatcher.BeginInvoke(new Action(() => LightStatus.Text = t)));
-            LightStatus.Text = msg;
-            BtnLightSdk.Visibility = Visibility.Collapsed;
-        }
-        catch (Exception ex) { LightStatus.Text = "Não foi possível instalar o SDK: " + ex.Message; return; }
-        finally
-        {
-            _lightBusy = false;
-            BtnLightSdk.IsEnabled = true;
-            BtnLightConnect.IsEnabled = true;
-        }
-        await ConnectAllAsync();
+        try { Process.Start(new ProcessStartInfo("https://github.com/CorsairOfficial/cue-sdk/releases") { UseShellExecute = true }); } catch { }
     }
 
     // ---------------- Controle ----------------

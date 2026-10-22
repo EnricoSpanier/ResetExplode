@@ -324,7 +324,7 @@ public static class DriverManager
 
     private static void VerifyPublisher(string path, string publisher)
     {
-        int trust = CorsairSdkInstaller.WinVerifyTrustFile(path);
+        int trust = Authenticode.WinVerifyTrustFile(path);
         if (trust != 0)
         {
             try { File.Delete(path); } catch { }
