@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -104,13 +104,25 @@ public sealed class AppSettings
             if (File.Exists(FilePath))
                 return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? new AppSettings();
         }
-        catch { }
+        catch
+        {
+            // JSON corrompido: guarda o arquivo em vez de descartá-lo (ele leva os backups de tweaks, inicialização e ComDB).
+            try { File.Move(FilePath, FilePath + ".bad", true); } catch { }
+        }
         return new AppSettings();
     }
 
     public void Save()
     {
         Directory.CreateDirectory(Folder);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        WriteAtomic(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+    }
+
+    /// <summary>Grava num .tmp e troca: uma queda no meio da escrita não deixa o arquivo pela metade.</summary>
+    public static void WriteAtomic(string path, string text, Encoding enc)
+    {
+        string tmp = path + ".tmp";
+        File.WriteAllText(tmp, text, enc);
+        if (File.Exists(path)) File.Replace(tmp, path, null); else File.Move(tmp, path);
     }
 }
