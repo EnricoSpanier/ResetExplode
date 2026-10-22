@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: publicar
@@ -18,10 +18,15 @@ concurrency:
 jobs:
   build:
     runs-on: windows-latest
+    # só este job publica; attestations/id-token geram a prova de origem (gh attestation verify) do .exe e do .zip
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: '8.0.x'
 
@@ -33,6 +38,14 @@ jobs:
         run: |
           Copy-Item LEIA-ME.txt dist/LEIA-ME.txt
           Compress-Archive -Path dist/ResetExplode.exe, dist/LEIA-ME.txt -DestinationPath ResetExplode.zip
+          Get-FileHash dist/ResetExplode.exe, ResetExplode.zip -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content SHA256SUMS.txt -Encoding ascii
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/ResetExplode.exe
+            ResetExplode.zip
 
       - name: Atualizar release "latest"
         if: startsWith(github.ref, 'refs/heads/')
@@ -42,7 +55,7 @@ jobs:
         run: |
           $sha = "$env:GITHUB_SHA".Substring(0, 7)
           gh release delete latest --cleanup-tag --yes
-          gh release create latest ResetExplode.zip dist/ResetExplode.exe --target $env:GITHUB_SHA --latest --title "RESET EXPLODE (versão mais recente)" --notes-file NOVIDADES.md
+          gh release create latest ResetExplode.zip dist/ResetExplode.exe SHA256SUMS.txt --target $env:GITHUB_SHA --latest --title "RESET EXPLODE (versão mais recente)" --notes-file NOVIDADES.md
 
       - name: Release da versão (tag)
         if: startsWith(github.ref, 'refs/tags/')
@@ -50,4 +63,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create $env:GITHUB_REF_NAME ResetExplode.zip dist/ResetExplode.exe --title "RESET EXPLODE $env:GITHUB_REF_NAME" --generate-notes --latest=false
+          gh release create $env:GITHUB_REF_NAME ResetExplode.zip dist/ResetExplode.exe SHA256SUMS.txt --title "RESET EXPLODE $env:GITHUB_REF_NAME" --generate-notes --latest=false
