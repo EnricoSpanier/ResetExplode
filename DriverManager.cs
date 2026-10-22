@@ -77,8 +77,6 @@ public static class DriverManager
         return c;
     }
 
-    public static string DownloadFolder => Path.Combine(Path.GetTempPath(), "ResetExplode", "drivers");
-
     // ------------------------------------------------------------------ WMI
 
     private static string? Str(ManagementBaseObject o, string p) => o[p]?.ToString()?.Trim();
@@ -289,8 +287,8 @@ public static class DriverManager
     /// <summary>Baixa o instalador, confere a assinatura da NVIDIA e abre o instalador oficial.</summary>
     public static async Task<string> DownloadAndLaunchAsync(GpuDriverStatus g, Action<string, double> progress, CancellationToken ct)
     {
-        Directory.CreateDirectory(DownloadFolder);
-        string file = Path.Combine(DownloadFolder, Path.GetFileName(new Uri(g.DownloadUrl).AbsolutePath));
+        string folder = AdminDir.Fresh("drivers");
+        string file = Path.Combine(folder, Path.GetFileName(new Uri(g.DownloadUrl).AbsolutePath));
         progress("Baixando o driver…", 0);
         using var dreq = new HttpRequestMessage(HttpMethod.Get, g.DownloadUrl);
         if (g.Vendor == "AMD") dreq.Headers.Referrer = new Uri("https://www.amd.com/");
@@ -318,7 +316,7 @@ public static class DriverManager
         progress("Criando ponto de restauração (se o Windows permitir)…", 1);
         string restore = await TryRestorePointAsync();
 
-        Process.Start(new ProcessStartInfo(file) { UseShellExecute = true, WorkingDirectory = DownloadFolder });
+        Process.Start(new ProcessStartInfo(file) { UseShellExecute = true, WorkingDirectory = folder });
         return $"Instalador {g.Latest} aberto (assinatura {g.Vendor} válida). {restore} Siga o instalador; a tela pode piscar durante a instalação.";
     }
 
@@ -346,7 +344,7 @@ public static class DriverManager
         }
     }
 
-    private static async Task<string> TryRestorePointAsync()
+    internal static async Task<string> TryRestorePointAsync()
     {
         try
         {
@@ -413,8 +411,10 @@ public static class DriverManager
         return list;
     });
 
-    public static Task<string> InstallWindowsUpdateAsync(List<WuDriver> items, Action<string> progress) => Task.Run(() =>
+    public static Task<string> InstallWindowsUpdateAsync(List<WuDriver> items, Action<string> progress) => Task.Run(async () =>
     {
+        progress("Criando ponto de restauração (se o Windows permitir)…");
+        string restore = await TryRestorePointAsync();
         dynamic session = NewCom("Microsoft.Update.Session");
         dynamic coll = NewCom("Microsoft.Update.UpdateColl");
         foreach (var d in items) { dynamic u = d.Update!; try { u.AcceptEula(); } catch { } coll.Add(u); }
@@ -429,7 +429,7 @@ public static class DriverManager
         int code = (int)res.ResultCode; // 2 = sucesso, 3 = sucesso com erros
         bool reboot = (bool)res.RebootRequired;
         string r = code is 2 or 3 ? "Instalação concluída." : $"Instalação terminou com código {code}.";
-        return r + (reboot ? " Reinicie o PC para finalizar." : "");
+        return r + (reboot ? " Reinicie o PC para finalizar." : "") + " " + restore;
     });
 
     // ------------------------------------------------------------------ Backup
